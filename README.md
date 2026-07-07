@@ -140,15 +140,6 @@ ac-insights/
 
 ---
 
-## 🗺️ Roadmap
-
-- [ ] Weekly study stats / streak tracker
-- [ ] Export notes to PDF / Markdown
-- [ ] Light theme option
-- [ ] Chrome Web Store listing
-
----
-
 ## ⚠️ Disclaimer
 
 This is an **unofficial, independently-built** extension created by a student, for students. It is not affiliated with or endorsed by Apna College. It does not modify, redistribute, or download any course video content — it only reads the page's DOM and captures live audio (locally, in-browser) to generate personal study notes. All processing happens client-side; no course content is ever uploaded or stored on any server other than the transcription/note-generation calls made directly to the user's chosen AI provider, using the user's own API key.
