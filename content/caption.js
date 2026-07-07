@@ -7,18 +7,49 @@ const ACCaptions = (() => {
   let notesUpdateCounter = 0;
   let currentVideoTitle = '';
   let currentApiKey = '';
+  let currentProvider = 'groq';
   let currentVideoElement = null;
 
-  // --- API Key ---
-  async function getApiKey() {
+  const PROVIDERS = {
+    groq: {
+      name: 'Groq',
+      keyPrefix: 'gsk_',
+      transcribeUrl: 'https://api.groq.com/openai/v1/audio/transcriptions',
+      chatUrl: 'https://api.groq.com/openai/v1/chat/completions',
+      transcribeModel: 'whisper-large-v3',
+      chatModel: 'llama-3.3-70b-versatile'
+    },
+    openai: {
+      name: 'OpenAI',
+      keyPrefix: 'sk-',
+      transcribeUrl: 'https://api.openai.com/v1/audio/transcriptions',
+      chatUrl: 'https://api.openai.com/v1/chat/completions',
+      transcribeModel: 'whisper-1',
+      chatModel: 'gpt-4o-mini'
+    }
+  };
+
+  // --- API Config (key + provider) ---
+  async function getApiConfig() {
     return new Promise(resolve =>
-      chrome.storage.local.get(['ac_openai_key'], r => resolve(r['ac_openai_key'] || null))
+      chrome.storage.local.get(['ac_api_key', 'ac_api_provider'], r =>
+        resolve({
+          key: r['ac_api_key'] || null,
+          provider: r['ac_api_provider'] || 'groq'
+        })
+      )
     );
   }
 
-  async function saveApiKey(key) {
+  async function saveApiConfig(key, provider) {
     return new Promise(resolve =>
-      chrome.storage.local.set({ 'ac_openai_key': key }, resolve)
+      chrome.storage.local.set({ 'ac_api_key': key, 'ac_api_provider': provider }, resolve)
+    );
+  }
+
+  async function removeApiConfig() {
+    return new Promise(resolve =>
+      chrome.storage.local.remove(['ac_api_key', 'ac_api_provider'], resolve)
     );
   }
 
@@ -80,42 +111,45 @@ const ACCaptions = (() => {
     return new MediaStream(audioTracks);
   }
 
-  // --- Whisper API ---
-  async function transcribe(blob, apiKey) {
+  // --- Transcription (provider-aware) ---
+  async function transcribe(blob, apiKey, provider) {
+    const config = PROVIDERS[provider];
     const formData = new FormData();
     formData.append('file', blob, 'audio.webm');
-    formData.append('model', 'whisper-large-v3');
+    formData.append('model', config.transcribeModel);
     formData.append('language', 'hi');
 
-    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    const res = await fetch(config.transcribeUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}` },
       body: formData
     });
 
     if (res.status === 401) {
-      await chrome.storage.local.remove('ac_openai_key');
+      await removeApiConfig();
       throw new Error('API key invalid/expired. Naya key enter karo.');
     }
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error?.message || 'Whisper API failed');
+      throw new Error(err.error?.message || 'Transcription failed');
     }
 
     return (await res.json()).text;
   }
 
-  // --- Groq Notes Generation ---
-  async function generateNotes(transcript, title, apiKey) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  // --- Notes Generation (provider-aware) ---
+  async function generateNotes(transcript, title, apiKey, provider) {
+    const config = PROVIDERS[provider];
+
+    const res = await fetch(config.chatUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: config.chatModel,
         max_tokens: 1500,
         temperature: 0.3,
         messages: [{
@@ -199,7 +233,7 @@ RULES:
       }
 
       try {
-        const text = await transcribe(blob, currentApiKey);
+        const text = await transcribe(blob, currentApiKey, currentProvider);
         accumulatedTranscript += text + ' ';
         await updateLiveNotes();
       } catch (err) {
@@ -223,7 +257,7 @@ RULES:
     if (notesUpdateCounter % 2 !== 0) return;
 
     try {
-      const notes = await generateNotes(accumulatedTranscript, currentVideoTitle, currentApiKey);
+      const notes = await generateNotes(accumulatedTranscript, currentVideoTitle, currentApiKey, currentProvider);
       showNotesPanel(currentVideoTitle, notes, null, true);
       await saveNotes(currentVideoTitle, notes, accumulatedTranscript);
     } catch (err) {
@@ -231,12 +265,13 @@ RULES:
     }
   }
 
-  async function startLiveTranscription(title, apiKey) {
+  async function startLiveTranscription(title, apiKey, provider) {
     isRecording = true;
     accumulatedTranscript = '';
     notesUpdateCounter = 0;
     currentVideoTitle = title;
     currentApiKey = apiKey;
+    currentProvider = provider;
 
     const audioStream = captureRealVideoAudio();
     showNotesPanel(title, null, '🎙️ Live transcription shuru ho gaya... Video dekhte raho!', true);
@@ -247,10 +282,8 @@ RULES:
     isRecording = false;
   }
 
-  // --- Handle Stop Button (shows final state after stopping) ---
   async function handleStopClick() {
     stopLiveTranscription();
-
     const saved = await loadNotes(currentVideoTitle);
     if (saved) {
       showSavedNotesPanel(currentVideoTitle, saved);
@@ -337,11 +370,12 @@ RULES:
     attachCommonListeners(panel, saved.notes);
 
     document.getElementById('ac-notes-regenerate')?.addEventListener('click', async () => {
-      const apiKey = await getApiKey();
+      const config = await getApiConfig();
+      if (!config.key) { showSettingsPrompt(); return; }
       await deleteNotes(title);
       panel.remove();
       try {
-        await startLiveTranscription(title, apiKey);
+        await startLiveTranscription(title, config.key, config.provider);
       } catch (err) {
         showNotesPanel(title, null, `❌ Error: ${err.message}`);
       }
@@ -355,8 +389,10 @@ RULES:
     });
   }
 
-  function showSettingsPrompt() {
+  async function showSettingsPrompt() {
     document.getElementById('ac-notes-panel')?.remove();
+
+    const existing = await getApiConfig();
 
     const panel = document.createElement('div');
     panel.id = 'ac-notes-panel';
@@ -366,11 +402,23 @@ RULES:
         <button id="ac-notes-close">✕</button>
       </div>
       <div class="ac-notes-body">
-        <p style="color:#94a3b8; margin-bottom:12px;">AI Notes ke liye Groq API key chahiye.</p>
-        <input id="ac-api-key-input" type="password" placeholder="gsk_..."
-          style="width:100%; padding:8px; background:#0f172a; border:1px solid #334155;
+        <p style="color:#94a3b8; margin-bottom:10px;">AI Notes ke liye API key chahiye.</p>
+
+        <label style="font-size:11px; color:#64748b;">Provider</label>
+        <select id="ac-provider-select" style="width:100%; padding:8px; margin:4px 0 10px;
+          background:#0f172a; border:1px solid #334155; color:#f1f5f9; border-radius:6px; font-size:12px;">
+          <option value="groq" ${existing.provider === 'groq' ? 'selected' : ''}>Groq (Free — gsk_...)</option>
+          <option value="openai" ${existing.provider === 'openai' ? 'selected' : ''}>OpenAI (Paid — sk-...)</option>
+        </select>
+
+        <label style="font-size:11px; color:#64748b;">API Key</label>
+        <input id="ac-api-key-input" type="password" placeholder="Enter your API key"
+          value="${existing.key || ''}"
+          style="width:100%; padding:8px; margin:4px 0 10px; background:#0f172a; border:1px solid #334155;
                  color:#f1f5f9; border-radius:6px; font-size:12px;" />
+
         <button id="ac-api-key-save">Save Key</button>
+        ${existing.key ? '<button id="ac-api-key-remove">🗑️ Remove Saved Key</button>' : ''}
       </div>
     `;
 
@@ -381,13 +429,25 @@ RULES:
 
     document.getElementById('ac-api-key-save')?.addEventListener('click', async () => {
       const key = document.getElementById('ac-api-key-input').value.trim();
-      if (!key.startsWith('gsk_')) {
-        alert('Valid Groq API key enter karo (gsk_ se shuru hoti hai)');
+      const provider = document.getElementById('ac-provider-select').value;
+      const expectedPrefix = PROVIDERS[provider].keyPrefix;
+
+      if (!key.startsWith(expectedPrefix)) {
+        alert(`Valid ${PROVIDERS[provider].name} API key enter karo (${expectedPrefix} se shuru hoti hai)`);
         return;
       }
-      await saveApiKey(key);
+
+      await saveApiConfig(key, provider);
       panel.remove();
       alert('✅ API Key saved! Ab video play karo aur 📝 click karo.');
+    });
+
+    document.getElementById('ac-api-key-remove')?.addEventListener('click', async () => {
+      if (confirm('Saved API key remove karna hai?')) {
+        await removeApiConfig();
+        panel.remove();
+        alert('API key removed.');
+      }
     });
   }
 
@@ -410,15 +470,15 @@ RULES:
 
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const apiKey = await getApiKey();
-        if (!apiKey) { showSettingsPrompt(); return; }
+        const config = await getApiConfig();
+        if (!config.key) { showSettingsPrompt(); return; }
 
         const currentSaved = await loadNotes(title);
         if (currentSaved) {
           showSavedNotesPanel(title, currentSaved);
         } else {
           try {
-            await startLiveTranscription(title, apiKey);
+            await startLiveTranscription(title, config.key, config.provider);
           } catch (err) {
             showNotesPanel(title, null, `❌ Error: ${err.message}`);
           }
@@ -429,12 +489,11 @@ RULES:
     });
   }
 
-  // --- Tab visibility handler ---
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && isRecording) {
       console.log('[AC Insights] Tab hidden, recording may be affected');
     }
   });
 
-  return { injectNotesButtons, showSettingsPrompt, getApiKey, saveApiKey };
+  return { injectNotesButtons, showSettingsPrompt, getApiConfig, saveApiConfig, removeApiConfig };
 })();

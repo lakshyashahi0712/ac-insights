@@ -669,3 +669,21 @@
 .ac-notes-header:active {
   cursor: grabbing;
 }
+
+#ac-provider-select {
+  cursor: pointer;
+}
+
+#ac-api-key-remove {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  background: #7f1d1d;
+  color: #fecaca;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#ac-api-key-remove:hover { background: #991b1b; }
