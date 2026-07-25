@@ -5,7 +5,7 @@ const ACSearch = (() => {
   let searchModal = null;
   let isOpen = false;
 
-  // Parser se saare videos ek flat array mein lao
+  // Get all videos from the parser into a flat array
   function buildIndex() {
     const data = ACParser.parseCourse();
     if (!data) return;
@@ -79,7 +79,7 @@ const ACSearch = (() => {
     if (!resultsEl) return;
 
     const filtered = query.length === 0
-      ? allVideos.slice(0, 20) // pehle 20 dikhao by default
+      ? allVideos.slice(0, 20) // show first 20 by default
       : allVideos.filter(v =>
           v.videoTitle.toLowerCase().includes(query.toLowerCase()) ||
           v.topicTitle.toLowerCase().includes(query.toLowerCase())
@@ -168,7 +168,7 @@ function setActive() {
   if (!btn) return;
   btn.classList.remove('idle');
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(setIdle, 3000); // 3 sec baad translucent
+  idleTimer = setTimeout(setIdle, 3000); // translucent after 3 sec
 }
 
 window.addEventListener('scroll', () => {
@@ -183,10 +183,10 @@ window.addEventListener('scroll', () => {
   }
   lastScroll = currentScroll;
 
-  setActive(); // scroll pe active ho jao
+  setActive(); // become active on scroll
 }, { passive: true });
 
-// Mouse hover pe bhi active ho jao
+// Also become active on mouse hover
 document.addEventListener('mousemove', (e) => {
   const btn = document.getElementById('ac-search-trigger');
   if (!btn) return;
@@ -195,5 +195,5 @@ document.addEventListener('mousemove', (e) => {
   if (near) setActive();
 });
 
-// Page load ke 3 sec baad idle
+// Go idle 3 sec after page load
 setTimeout(setIdle, 3000);

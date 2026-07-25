@@ -13,7 +13,7 @@ function makeDraggable(panel, handleSelector) {
   let startX, startY, initLeft, initTop;
 
   handle.addEventListener('mousedown', (e) => {
-    // Buttons pe click karo toh drag mat shuru karo
+    // Don't start dragging when clicking on buttons
     if (e.target.tagName === 'BUTTON') return;
 
     isDragging = true;
@@ -25,7 +25,7 @@ function makeDraggable(panel, handleSelector) {
     initLeft = rect.left;
     initTop = rect.top;
 
-    // Position fixed set karo agar nahi hai
+    // Set position to fixed if not already
     panel.style.position = 'fixed';
     panel.style.margin = '0';
     panel.style.left = `${initLeft}px`;
@@ -45,7 +45,7 @@ function makeDraggable(panel, handleSelector) {
     let newLeft = initLeft + dx;
     let newTop = initTop + dy;
 
-    // Screen ke bahar mat jaane do
+    // Don't let the panel go outside the screen
     const panelW = panel.offsetWidth;
     const panelH = panel.offsetHeight;
     newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - panelW));

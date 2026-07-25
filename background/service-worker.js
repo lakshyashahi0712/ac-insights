@@ -1,6 +1,6 @@
 chrome.webRequest.onBeforeRequest.addListener(
   (details) => {
-    // Sirf woh URL jo .m3u8 pe KHATAM hoti hai, .ts segment nahi
+    // Only URLs that END with .m3u8, not .ts segments
     if (details.url.endsWith('.m3u8') && details.url.includes('wistia')) {
       console.log('[AC Insights] Real M3U8 manifest captured:', details.url);
       chrome.storage.local.set({

@@ -687,3 +687,17 @@
 }
 
 #ac-api-key-remove:hover { background: #991b1b; }
+
+.ac-settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.3;
+  transition: opacity 0.2s;
+  margin-left: 2px;
+}
+
+.ac-settings-btn:hover { opacity: 0.9; }

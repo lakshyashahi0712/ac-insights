@@ -39,7 +39,7 @@ const ACBookmarks = (() => {
 
   // --- UI ---
 
-  // Har video row ke paas bookmark button inject karo
+  // Inject a bookmark button next to each video row
   async function injectBookmarkButtons() {
     const items = document.querySelectorAll('li.lrn-path-cont');
 
@@ -82,13 +82,13 @@ const ACBookmarks = (() => {
         }
       });
 
-      // Extras div ke andar add karo
+      // Add inside the extras div
       const extrasEl = item.querySelector('.lrn-path-cont-extras');
       if (extrasEl) extrasEl.appendChild(btn);
     }
   }
 
-  // Bookmarks panel — popup se trigger hoga
+  // Bookmarks panel — triggered from popup
   async function showPanel() {
     document.getElementById('ac-bookmarks-panel')?.remove();
 
@@ -150,7 +150,7 @@ const ACBookmarks = (() => {
         const title = btn.dataset.title;
         await remove(title);
 
-        // Page pe bookmark button bhi update karo
+        // Also update the bookmark button on the page
         document.querySelectorAll('.ac-bookmark-btn.active')
           .forEach(b => {
             const row = b.closest('li.lrn-path-cont');
@@ -163,7 +163,7 @@ const ACBookmarks = (() => {
 
         btn.closest('.ac-bm-item').remove();
 
-        // Agar list empty ho gayi
+        // If the list is now empty
         const remaining = panel.querySelectorAll('.ac-bm-item').length;
         if (remaining === 0) {
           panel.querySelector('.ac-bm-list').innerHTML =

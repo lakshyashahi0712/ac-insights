@@ -98,15 +98,15 @@ const ACCaptions = (() => {
       }
     }
 
-    if (!acVideo) throw new Error('Video player nahi mila. Pehle video PLAY karo, phir 📝 click karo.');
-    if (acVideo.paused) throw new Error('Video paused hai. Pehle ▶️ play karo, phir 📝 click karo.');
+    if (!acVideo) throw new Error('Video player not found. Please PLAY the video first, then click 📝.');
+    if (acVideo.paused) throw new Error('Video is paused. Please ▶️ play the video first, then click 📝.');
 
     currentVideoElement = acVideo;
 
     const stream = acVideo.captureStream?.() || acVideo.mozCaptureStream?.();
     const audioTracks = stream?.getAudioTracks() || [];
 
-    if (audioTracks.length === 0) throw new Error('Audio track nahi mila. Video properly play ho raha hai?');
+    if (audioTracks.length === 0) throw new Error('No audio track found. Is the video playing properly?');
 
     return new MediaStream(audioTracks);
   }
@@ -127,7 +127,7 @@ const ACCaptions = (() => {
 
     if (res.status === 401) {
       await removeApiConfig();
-      throw new Error('API key invalid/expired. Naya key enter karo.');
+      throw new Error('API key is invalid or expired. Please enter a new key.');
     }
 
     if (!res.ok) {
@@ -138,7 +138,7 @@ const ACCaptions = (() => {
     return (await res.json()).text;
   }
 
-  // --- Notes Generation (provider-aware) ---
+ // --- Notes Generation (provider-aware) ---
   async function generateNotes(transcript, title, apiKey, provider) {
     const config = PROVIDERS[provider];
 
@@ -154,40 +154,43 @@ const ACCaptions = (() => {
         temperature: 0.3,
         messages: [{
           role: 'user',
-          content: `Tum ek expert DSA teacher ho jo Java padhata hai. Neeche ek lecture transcript hai video "${title}" ka.
+          content: `You are an expert programming teacher. Below is a lecture transcript for the video "${title}".
 
 TRANSCRIPT:
 ${transcript}
 
-Is transcript se DETAILED study notes banao — sirf generic summary mat do.
+Create DETAILED study notes from this transcript — do not write a generic summary.
+
+FIRST, detect which programming language this lecture is about from the transcript (Java, C++, Python, JavaScript, or any other) — write the code section in that detected language, do not assume Java.
 
 ## ${title}
 
 ### Concept Explanation
-(Teacher ne jo exact tareeke se samjhaya — examples, analogies sab include karo)
+(Explain exactly how the teacher explained it — include all examples and analogies mentioned in the transcript)
 
 ### Key Definitions
-(Teacher ne jo terms define kiye, unke close wording mein likho)
+(If the teacher defined any terms, write them close to the original wording)
 
 ### Examples Discussed
-(Specific examples/numbers/cases jo transcript mein hain)
+(List the specific examples/numbers/cases discussed in the transcript)
 
-### Code/Logic (agar mentioned ho)
-(Jo bhi programming logic verbally explain hua — "if", "for loop", "modulo" etc — Java code mein convert karo)
+### Code/Logic (if mentioned)
+(Convert any programming logic explained verbally — using the detected language's correct syntax — wrap it in a code block with the correct language tag, e.g. \`\`\`python or \`\`\`cpp or \`\`\`java)
 
 ### Common Mistakes/Tips
-(Koi warning ya tip jo teacher ne di ho)
+(Any warning or tip the teacher gave)
 
 RULES:
-- Sirf transcript mein jo bola gaya wahi likho
-- Hinglish mein likho
-- Agar video chal rahi hai: "⚠️ Note: Video abhi chal rahi hai, yeh ab tak ke notes hain"
-- Khaali section mein "Mentioned nahi transcript mein" likho`
+- Only write what was actually said in the transcript, do not make things up
+- Write the notes content in Hinglish using ROMAN/ENGLISH script only (e.g. "yeh function declare karna hota hai") — do NOT use Devanagari/Hindi script (do not write हिंदी अक्षर)
+- Detect the code language from the transcript, do not assume Java
+- If the video is still playing, add at the end: "⚠️ Note: Video is still playing, these are notes so far"
+- If a section has no relevant content, write "Not mentioned in transcript" instead of leaving it blank`
         }]
       })
     });
 
-    if (res.status === 429) throw new Error('Rate limit hit. Thodi der ruk ke try karo.');
+    if (res.status === 429) throw new Error('Rate limit reached. Please wait a moment and try again.');
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error?.message || 'Notes generation failed');
@@ -199,7 +202,7 @@ RULES:
   // --- Notes Formatting ---
   function formatNotesHTML(notes) {
     return notes
-      .replace(/```java([\s\S]*?)```/g, '<pre class="ac-code-block"><code>$1</code></pre>')
+      .replace(/```(\w+)?([\s\S]*?)```/g, '<pre class="ac-code-block"><code>$2</code></pre>')
       .replace(/### (.*)/g, '<h4 class="ac-notes-h4">$1</h4>')
       .replace(/## (.*)/g, '<h3 class="ac-notes-h3">$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -274,7 +277,7 @@ RULES:
     currentProvider = provider;
 
     const audioStream = captureRealVideoAudio();
-    showNotesPanel(title, null, '🎙️ Live transcription shuru ho gaya... Video dekhte raho!', true);
+    showNotesPanel(title, null, '🎙️ Live transcription started... Keep watching the video!', true);
     recordNextChunk(audioStream);
   }
 
@@ -288,7 +291,7 @@ RULES:
     if (saved) {
       showSavedNotesPanel(currentVideoTitle, saved);
     } else {
-      showNotesPanel(currentVideoTitle, null, '⏹️ Live notes stopped. Koi notes generate nahi hui abhi tak.', false);
+      showNotesPanel(currentVideoTitle, null, '⏹️ Live notes stopped. No notes have been generated yet.', false);
     }
   }
 
@@ -382,7 +385,7 @@ RULES:
     });
 
     document.getElementById('ac-notes-delete')?.addEventListener('click', async () => {
-      if (confirm('Saved notes delete karein?')) {
+      if (confirm('Delete saved notes?')) {
         await deleteNotes(title);
         panel.remove();
       }
@@ -402,7 +405,7 @@ RULES:
         <button id="ac-notes-close">✕</button>
       </div>
       <div class="ac-notes-body">
-        <p style="color:#94a3b8; margin-bottom:10px;">AI Notes ke liye API key chahiye.</p>
+        <p style="color:#94a3b8; margin-bottom:10px;">An API key is required for AI Notes.</p>
 
         <label style="font-size:11px; color:#64748b;">Provider</label>
         <select id="ac-provider-select" style="width:100%; padding:8px; margin:4px 0 10px;
@@ -433,17 +436,17 @@ RULES:
       const expectedPrefix = PROVIDERS[provider].keyPrefix;
 
       if (!key.startsWith(expectedPrefix)) {
-        alert(`Valid ${PROVIDERS[provider].name} API key enter karo (${expectedPrefix} se shuru hoti hai)`);
+        alert(`Please enter a valid ${PROVIDERS[provider].name} API key (it should start with ${expectedPrefix})`);
         return;
       }
 
       await saveApiConfig(key, provider);
       panel.remove();
-      alert('✅ API Key saved! Ab video play karo aur 📝 click karo.');
+      alert('✅ API Key saved! Now play a video and click 📝 to generate notes.');
     });
 
     document.getElementById('ac-api-key-remove')?.addEventListener('click', async () => {
-      if (confirm('Saved API key remove karna hai?')) {
+      if (confirm('Remove the saved API key?')) {
         await removeApiConfig();
         panel.remove();
         alert('API key removed.');
@@ -452,42 +455,54 @@ RULES:
   }
 
   // --- Inject Buttons ---
-  function injectNotesButtons() {
-    document.querySelectorAll('li.lrn-path-cont').forEach(async item => {
-      if (item.querySelector('.ac-notes-btn')) return;
+ function injectNotesButtons() {
+  document.querySelectorAll('li.lrn-path-cont').forEach(async item => {
+    if (item.querySelector('.ac-notes-btn')) return;
 
-      const titleEl = item.querySelector('.lrn-path-cont-name');
-      const extrasEl = item.querySelector('.lrn-path-cont-extras');
-      if (!titleEl || !extrasEl) return;
+    const titleEl = item.querySelector('.lrn-path-cont-name');
+    const extrasEl = item.querySelector('.lrn-path-cont-extras');
+    if (!titleEl || !extrasEl) return;
 
-      const title = titleEl.textContent.trim();
-      const saved = await loadNotes(title);
+    const title = titleEl.textContent.trim();
+    const saved = await loadNotes(title);
 
-      const btn = document.createElement('button');
-      btn.className = `ac-notes-btn ${saved ? 'has-saved' : ''}`;
-      btn.title = saved ? 'View Saved Notes' : 'Start Live AI Notes';
-      btn.innerHTML = saved ? '📄' : '📝';
+    const btn = document.createElement('button');
+    btn.className = `ac-notes-btn ${saved ? 'has-saved' : ''}`;
+    btn.title = saved ? 'View Saved Notes' : 'Start Live AI Notes';
+    btn.innerHTML = saved ? '📄' : '📝';
 
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const config = await getApiConfig();
-        if (!config.key) { showSettingsPrompt(); return; }
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const config = await getApiConfig();
+      if (!config.key) { showSettingsPrompt(); return; }
 
-        const currentSaved = await loadNotes(title);
-        if (currentSaved) {
-          showSavedNotesPanel(title, currentSaved);
-        } else {
-          try {
-            await startLiveTranscription(title, config.key, config.provider);
-          } catch (err) {
-            showNotesPanel(title, null, `❌ Error: ${err.message}`);
-          }
+      const currentSaved = await loadNotes(title);
+      if (currentSaved) {
+        showSavedNotesPanel(title, currentSaved);
+      } else {
+        try {
+          await startLiveTranscription(title, config.key, config.provider);
+        } catch (err) {
+          showNotesPanel(title, null, `❌ Error: ${err.message}`);
         }
-      });
-
-      extrasEl.appendChild(btn);
+      }
     });
-  }
+
+    // Settings button — hamesha available, provider/key switch karne ke liye
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'ac-settings-btn';
+    settingsBtn.title = 'AI Provider Settings';
+    settingsBtn.innerHTML = '⚙️';
+
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showSettingsPrompt();
+    });
+
+    extrasEl.appendChild(btn);
+    extrasEl.appendChild(settingsBtn);
+  });
+}
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && isRecording) {
