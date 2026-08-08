@@ -701,3 +701,12 @@
 }
 
 .ac-settings-btn:hover { opacity: 0.9; }
+
+
+.ac-badge-unwatched {
+  background: #422006;
+  color: #fbbf24;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  font-weight: 600;
+}

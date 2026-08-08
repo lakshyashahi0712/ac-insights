@@ -10,30 +10,35 @@ const ACUI = (() => {
    * Uses data-attribute to avoid double-injecting
    */
   function injectTopicBadge(topicEl, topicData) {
-    // Idempotency check — don't inject twice
-    if (topicEl.dataset.acInsights === 'true') return;
-    topicEl.dataset.acInsights = 'true';
+  if (topicEl.dataset.acInsights === 'true') return;
+  topicEl.dataset.acInsights = 'true';
 
-    const titleEl = topicEl.querySelector(ACParser.SELECTORS.topicTitle);
-    if (!titleEl) return;
+  const titleEl = topicEl.querySelector(ACParser.SELECTORS.topicTitle);
+  if (!titleEl) return;
 
-    const badge = document.createElement('span');
-    badge.className = BADGE_CLASS;
+  const badge = document.createElement('span');
+  badge.className = BADGE_CLASS;
 
-    const duration = DurationUtils.formatDuration(topicData.totalSeconds);
-    const completed = topicData.completedCount;
-    const total = topicData.videoCount;
-    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const duration = DurationUtils.formatDuration(topicData.totalSeconds);
+  const completed = topicData.completedCount;
+  const total = topicData.videoCount;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    badge.innerHTML = `
-      <span class="ac-badge-videos">📹 ${total} videos</span>
-      <span class="ac-badge-duration">⏱️ ${duration}</span>
-      ${completed > 0 ? `<span class="ac-badge-progress">${pct}% done</span>` : ''}
-    `;
+  // Unwatched duration calculate karo
+  const unwatchedSeconds = topicData.videos
+    .filter(v => !v.isCompleted)
+    .reduce((sum, v) => sum + v.seconds, 0);
+  const unwatchedDuration = DurationUtils.formatDuration(unwatchedSeconds);
 
-    // Insert AFTER title, not inside it (avoid breaking click handlers)
-    titleEl.insertAdjacentElement('afterend', badge);
-  }
+  badge.innerHTML = `
+    <span class="ac-badge-videos">📹 ${total} videos</span>
+    <span class="ac-badge-duration">⏱️ ${duration}</span>
+    ${completed > 0 ? `<span class="ac-badge-progress">${pct}% done</span>` : ''}
+    ${unwatchedSeconds > 0 ? `<span class="ac-badge-unwatched">⏳ ${unwatchedDuration} left</span>` : ''}
+  `;
+
+  titleEl.insertAdjacentElement('afterend', badge);
+}
 
   /**
    * Injects or updates the floating course summary panel

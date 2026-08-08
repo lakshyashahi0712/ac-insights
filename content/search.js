@@ -118,12 +118,32 @@ const ACSearch = (() => {
     return text.replace(regex, '<mark>$1</mark>');
   }
 
-  function jumpToVideo(video) {
-    if (video.element) {
-      video.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      video.element.click();
-    }
+function jumpToVideo(video) {
+  if (!video.element) {
+    alert('Video element not found. Try expanding the topic manually.');
+    return;
   }
+
+  const chapter = video.element.closest('.lrn-path-chapter');
+  const isOpen = chapter?.classList.contains('lrn-path-chapter-open');
+
+  if (chapter && !isOpen) {
+    // Chapter ka actual clickable title text yeh hai
+    const chapterTitleTxt = chapter.querySelector('.lrn-path-chapter-name-txt');
+    const chapterTitleWrap = chapter.querySelector('.lrn-path-chapter-name');
+    (chapterTitleTxt || chapterTitleWrap)?.click();
+  }
+
+  setTimeout(() => {
+    video.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    setTimeout(() => {
+      // Actual clickable link andar hai, li pe click nahi karna
+      const link = video.element.querySelector('.lrn-path-cont-link') || video.element;
+      link.click();
+    }, 500);
+  }, 500);
+}
 
   let selectedIndex = -1;
   function handleKeydown(e) {
