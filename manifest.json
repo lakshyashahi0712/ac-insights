@@ -3,7 +3,7 @@
   "name": "AC Insights",
   "version": "1.0.0",
   "description": "Analytics for Apna College Premium students.",
-"permissions": ["storage", "activeTab", "scripting", "webRequest"], 
+"permissions": ["storage", "unlimitedStorage", "activeTab", "scripting", "webRequest"], 
 "host_permissions": [
     "https://www.apnacollege.in/*",
     "https://*.wistia.com/*",
@@ -13,13 +13,16 @@
     {
       "matches": ["https://www.apnacollege.in/*"],
       "js": [
+        "lib/jspdf/jspdf.umd.min.js",
         "utils/duration.js",
         "utils/draggable.js",
         "content/storage.js",
         "content/parser.js",
         "content/search.js",
         "content/ui.js",
+        "content/pdf-export.js",
         "content/bookmarks.js",
+        "content/prevent-autonext.js",
         "content/caption.js",
         "content/observer.js",
         "content/main.js"

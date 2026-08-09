@@ -710,3 +710,92 @@
   border-radius: 9999px;
   font-weight: 600;
 }
+
+.ac-typing-cursor {
+  display: inline-block;
+  width: 2px;
+  margin-left: 2px;
+  animation: ac-blink 0.9s step-start infinite;
+  color: #60a5fa;
+}
+
+@keyframes ac-blink {
+  50% { opacity: 0; }
+}
+
+.ac-screenshots-strip:empty { display: none; }
+
+.ac-screenshots-label {
+  font-size: 11px;
+  color: #64748b;
+  margin: 14px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid #334155;
+}
+
+.ac-screenshots-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.ac-screenshot-thumb {
+  width: 90px;
+  height: 55px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.ac-screenshot-thumb:hover {
+  transform: scale(1.05);
+  border-color: #3b82f6;
+}
+
+.ac-screenshot-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 9999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ac-screenshot-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+
+.ac-typing-cursor {
+  display: inline-block;
+  width: 2px;
+  margin-left: 2px;
+  animation: ac-blink 0.9s step-start infinite;
+  color: #60a5fa;
+}
+
+@keyframes ac-blink {
+  50% { opacity: 0; }
+}
+
+#ac-notes-pdf {
+  width: 100%;
+  padding: 8px;
+  background: #1e40af;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+#ac-notes-pdf:hover { background: #1d4ed8; }
+#ac-notes-pdf:disabled { opacity: 0.6; cursor: wait; }

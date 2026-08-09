@@ -57,6 +57,8 @@
   if (found) await runAnalysis();
 
   ACObserver.start(runAnalysis);
+  ACPreventAutoNext.recheck();
+  ACPreventAutoNext.enable();
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'SHOW_SUMMARY') {
