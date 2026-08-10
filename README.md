@@ -111,34 +111,6 @@ This was the hardest part to get right — Apna College's videos have no caption
 
 ---
 
-## 📂 Project Structure
-
-```
-ac-insights/
-├── manifest.json
-├── background/
-│   └── service-worker.js
-├── content/
-│   ├── main.js
-│   ├── parser.js
-│   ├── ui.js
-│   ├── search.js
-│   ├── bookmarks.js
-│   ├── captions.js
-│   ├── storage.js
-│   └── observer.js
-├── utils/
-│   ├── duration.js
-│   └── draggable.js
-├── popup/
-│   ├── popup.html
-│   ├── popup.js
-│   └── popup.css
-└── styles/
-    └── injected.css
-```
-
----
 
 ## ⚠️ Disclaimer
 
