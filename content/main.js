@@ -25,6 +25,7 @@
       .catch(() => {});
 
     ACUI.injectSearchButton();
+    ACSearch.attachIframeListener();
     await ACBookmarks.injectBookmarkButtons();
     ACCaptions.injectNotesButtons();
   }

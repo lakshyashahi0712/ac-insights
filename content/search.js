@@ -1,11 +1,11 @@
 // content/search.js
 
 const ACSearch = (() => {
-  let allVideos = []; // flat list of all videos
+  let allVideos = [];
   let searchModal = null;
   let isOpen = false;
+  let attachedIframeDoc = null;
 
-  // Get all videos from the parser into a flat array
   function buildIndex() {
     const data = ACParser.parseCourse();
     if (!data) return;
@@ -18,7 +18,7 @@ const ACSearch = (() => {
           videoTitle: video.title || `Video ${i + 1}`,
           duration: DurationUtils.formatDuration(video.seconds),
           isCompleted: video.isCompleted,
-          element: video.element, // DOM element — for clicking
+          element: video.element,
         });
       });
     });
@@ -61,16 +61,12 @@ const ACSearch = (() => {
 
     document.body.appendChild(searchModal);
 
-    // Events
     document.getElementById('ac-search-input').addEventListener('input', (e) => {
       performSearch(e.target.value.trim());
     });
 
     document.getElementById('ac-search-backdrop').addEventListener('click', close);
 
-    document.addEventListener('keydown', handleKeydown);
-
-    // Show all videos initially
     performSearch('');
   }
 
@@ -79,7 +75,7 @@ const ACSearch = (() => {
     if (!resultsEl) return;
 
     const filtered = query.length === 0
-      ? allVideos.slice(0, 20) // show first 20 by default
+      ? allVideos.slice(0, 20)
       : allVideos.filter(v =>
           v.videoTitle.toLowerCase().includes(query.toLowerCase()) ||
           v.topicTitle.toLowerCase().includes(query.toLowerCase())
@@ -103,7 +99,6 @@ const ACSearch = (() => {
       </div>
     `).join('');
 
-    // Click handlers
     resultsEl.querySelectorAll('.ac-search-item').forEach((el, i) => {
       el.addEventListener('click', () => {
         jumpToVideo(filtered[i]);
@@ -118,32 +113,30 @@ const ACSearch = (() => {
     return text.replace(regex, '<mark>$1</mark>');
   }
 
-function jumpToVideo(video) {
-  if (!video.element) {
-    alert('Video element not found. Try expanding the topic manually.');
-    return;
-  }
+  function jumpToVideo(video) {
+    if (!video.element) {
+      alert('Video element not found. Try expanding the topic manually.');
+      return;
+    }
 
-  const chapter = video.element.closest('.lrn-path-chapter');
-  const isOpen = chapter?.classList.contains('lrn-path-chapter-open');
+    const chapter = video.element.closest('.lrn-path-chapter');
+    const isOpen = chapter?.classList.contains('lrn-path-chapter-open');
 
-  if (chapter && !isOpen) {
-    // Chapter ka actual clickable title text yeh hai
-    const chapterTitleTxt = chapter.querySelector('.lrn-path-chapter-name-txt');
-    const chapterTitleWrap = chapter.querySelector('.lrn-path-chapter-name');
-    (chapterTitleTxt || chapterTitleWrap)?.click();
-  }
-
-  setTimeout(() => {
-    video.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (chapter && !isOpen) {
+      const chapterTitleTxt = chapter.querySelector('.lrn-path-chapter-name-txt');
+      const chapterTitleWrap = chapter.querySelector('.lrn-path-chapter-name');
+      (chapterTitleTxt || chapterTitleWrap)?.click();
+    }
 
     setTimeout(() => {
-      // Actual clickable link andar hai, li pe click nahi karna
-      const link = video.element.querySelector('.lrn-path-cont-link') || video.element;
-      link.click();
+      video.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      setTimeout(() => {
+        const link = video.element.querySelector('.lrn-path-cont-link') || video.element;
+        link.click();
+      }, 500);
     }, 500);
-  }, 500);
-}
+  }
 
   let selectedIndex = -1;
   function handleKeydown(e) {
@@ -161,59 +154,80 @@ function jumpToVideo(video) {
     items.forEach((el, i) => el.classList.toggle('selected', i === selectedIndex));
   }
 
-  return { open, close, buildIndex };
+  document.addEventListener('keydown', handleKeydown);
+
+  // --- Ctrl+K shortcut — attached to main document AND the video iframe's document ---
+  function handleShortcut(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      e.stopPropagation();
+      open();
+    }
+  }
+
+  document.addEventListener('keydown', handleShortcut);
+
+  // The video player lives inside a same-origin iframe. When focus is inside it,
+  // keydown events never reach the main document, so Chrome's own Ctrl+K
+  // (search-in-omnibox) fires instead. Attach the same shortcut listener
+  // directly onto the iframe's document too.
+  function attachIframeListener() {
+    const iframe = document.getElementById('playerFrame') || document.querySelector('iframe');
+    if (!iframe) return;
+
+    let iframeDoc;
+    try {
+      iframeDoc = iframe.contentDocument;
+    } catch (e) {
+      return; // cross-origin, nothing we can do
+    }
+
+    if (!iframeDoc || iframeDoc === attachedIframeDoc) return;
+
+    iframeDoc.addEventListener('keydown', handleShortcut);
+    attachedIframeDoc = iframeDoc;
+    console.log('[AC Insights] Search shortcut attached inside video iframe');
+  }
+
+  // --- Floating search button behavior ---
+  let lastScroll = 0;
+  let idleTimer = null;
+
+  function setIdle() {
+    document.getElementById('ac-search-trigger')?.classList.add('idle');
+  }
+
+  function setActive() {
+    const btn = document.getElementById('ac-search-trigger');
+    if (!btn) return;
+    btn.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(setIdle, 3000);
+  }
+
+  window.addEventListener('scroll', () => {
+    const btn = document.getElementById('ac-search-trigger');
+    if (!btn) return;
+
+    const currentScroll = window.scrollY;
+    if (currentScroll > lastScroll && currentScroll > 100) {
+      btn.classList.add('collapsed');
+    } else {
+      btn.classList.remove('collapsed');
+    }
+    lastScroll = currentScroll;
+    setActive();
+  }, { passive: true });
+
+  document.addEventListener('mousemove', (e) => {
+    const btn = document.getElementById('ac-search-trigger');
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const near = e.clientX > rect.left - 60 && e.clientY > rect.top - 60;
+    if (near) setActive();
+  });
+
+  setTimeout(setIdle, 3000);
+
+  return { open, close, buildIndex, attachIframeListener };
 })();
-
-// Ctrl+K shortcut
-document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault();
-    ACSearch.open();
-  }
-});
-
-// Search button collapse/expand on scroll
-// Search button collapse/expand + translucent on idle
-let lastScroll = 0;
-let idleTimer = null;
-
-function setIdle() {
-  const btn = document.getElementById('ac-search-trigger');
-  if (!btn) return;
-  btn.classList.add('idle');
-}
-
-function setActive() {
-  const btn = document.getElementById('ac-search-trigger');
-  if (!btn) return;
-  btn.classList.remove('idle');
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(setIdle, 3000); // translucent after 3 sec
-}
-
-window.addEventListener('scroll', () => {
-  const btn = document.getElementById('ac-search-trigger');
-  if (!btn) return;
-
-  const currentScroll = window.scrollY;
-  if (currentScroll > lastScroll && currentScroll > 100) {
-    btn.classList.add('collapsed');
-  } else {
-    btn.classList.remove('collapsed');
-  }
-  lastScroll = currentScroll;
-
-  setActive(); // become active on scroll
-}, { passive: true });
-
-// Also become active on mouse hover
-document.addEventListener('mousemove', (e) => {
-  const btn = document.getElementById('ac-search-trigger');
-  if (!btn) return;
-  const rect = btn.getBoundingClientRect();
-  const near = e.clientX > rect.left - 60 && e.clientY > rect.top - 60;
-  if (near) setActive();
-});
-
-// Go idle 3 sec after page load
-setTimeout(setIdle, 3000);
