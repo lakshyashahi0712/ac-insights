@@ -12,7 +12,7 @@ const DurationUtils = (() => {
     const str = raw.trim();
 
     // Format: HH:MM:SS or MM:SS
-    const colonMatch = str.match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
+    const colonMatch = str.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);  // 1 ya 2 digits allow karo
     if (colonMatch) {
       const [, a, b, c] = colonMatch;
       if (c !== undefined) {

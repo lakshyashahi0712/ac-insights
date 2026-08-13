@@ -4,14 +4,21 @@ const ACStorage = (() => {
   const KEY = 'ac_insights_cache';
 
   async function save(data) {
-    try {
-      return new Promise(resolve => {
-        chrome.storage.local.set({ [KEY]: data }, resolve);
-      });
-    } catch (e) {
-      console.warn('[AC Insights] Storage save failed — extension reloaded?');
-    }
-  }
+    if (!chrome.runtime?.id) return; // extension context check, synchronous
+    return new Promise(resolve => {
+      try {
+        chrome.storage.local.set({ [KEY]: data }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[AC Insights] Storage save failed:', chrome.runtime.lastError.message);
+          }
+          resolve();
+        });
+      } catch (e) {
+        console.warn('[AC Insights] Storage save failed — extension reloaded?');
+        resolve();
+      }
+    });
+}
 
   async function load() {
     try {
@@ -33,5 +40,5 @@ const ACStorage = (() => {
     } catch (e) {}
   }
 
-  return { save, load, clear };
+  return { save };
 })();

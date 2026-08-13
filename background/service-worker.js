@@ -1,22 +1,4 @@
-chrome.webRequest.onBeforeRequest.addListener(
-  (details) => {
-    // Only URLs that END with .m3u8, not .ts segments
-    if (details.url.endsWith('.m3u8') && details.url.includes('wistia')) {
-      console.log('[AC Insights] Real M3U8 manifest captured:', details.url);
-      chrome.storage.local.set({
-        'ac_current_m3u8': details.url,
-        'ac_m3u8_timestamp': Date.now()
-      });
-    }
-  },
-  { urls: ["*://*.wistia.com/*"] }
-);
-
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'GET_M3U8') {
-    chrome.storage.local.get(['ac_current_m3u8'], (result) => {
-      sendResponse({ url: result['ac_current_m3u8'] || null });
-    });
-    return true;
-  }
-});
+// background/service-worker.js
+// Currently unused — reserved for future background tasks
+// (e.g. cross-tab notifications, scheduled reminders).
+console.log('[AC Insights] Service worker ready.');

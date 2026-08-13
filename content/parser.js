@@ -77,4 +77,3 @@ const ACParser = (() => {
   return { parseCourse, SELECTORS };
 })();
 
-window._ACParser = ACParser;

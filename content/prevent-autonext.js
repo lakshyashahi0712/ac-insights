@@ -28,23 +28,28 @@ const ACPreventAutoNext = (() => {
     }
   }
 
-  function attachListener() {
+  let attachedVideo = null; // track which exact video element has our listeners
+
+function attachListener() {
     const video = getVideo();
-    if (!video || video === currentVideo) return;
+    if (!video) return;
+
+    if (video === attachedVideo) return; // already attached, nothing to do
 
     currentVideo = video;
+    attachedVideo = video;
 
-    // 'timeupdate' pe continuously check karo — 'ended' se pehle hi intercept karo
     video.addEventListener('timeupdate', preventJump);
+    video.addEventListener('ended', handleEnded, true);
+}
 
-    // Extra safety — agar 'ended' phir bhi fire ho jaye
-    video.addEventListener('ended', (e) => {
-      if (!isEnabled) return;
-      e.stopImmediatePropagation();
-      video.pause();
-      video.currentTime = Math.max(0, video.duration - 0.15);
-    }, true); // capture phase — AC ke listener se pehle chalne ki koshish
-  }
+function handleEnded(e) {
+    if (!isEnabled) return;
+    e.stopImmediatePropagation();
+    const video = e.target;
+    video.pause();
+    video.currentTime = Math.max(0, video.duration - 0.15);
+}
 
   function enable() {
     isEnabled = true;

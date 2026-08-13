@@ -12,8 +12,7 @@ function makeDraggable(panel, handleSelector) {
   let isDragging = false;
   let startX, startY, initLeft, initTop;
 
-  handle.addEventListener('mousedown', (e) => {
-    // Don't start dragging when clicking on buttons
+  function onMouseDown(e) {
     if (e.target.tagName === 'BUTTON') return;
 
     isDragging = true;
@@ -25,7 +24,6 @@ function makeDraggable(panel, handleSelector) {
     initLeft = rect.left;
     initTop = rect.top;
 
-    // Set position to fixed if not already
     panel.style.position = 'fixed';
     panel.style.margin = '0';
     panel.style.left = `${initLeft}px`;
@@ -34,9 +32,9 @@ function makeDraggable(panel, handleSelector) {
     panel.style.bottom = 'auto';
 
     e.preventDefault();
-  });
+  }
 
-  document.addEventListener('mousemove', (e) => {
+  function onMouseMove(e) {
     if (!isDragging) return;
 
     const dx = e.clientX - startX;
@@ -45,7 +43,6 @@ function makeDraggable(panel, handleSelector) {
     let newLeft = initLeft + dx;
     let newTop = initTop + dy;
 
-    // Don't let the panel go outside the screen
     const panelW = panel.offsetWidth;
     const panelH = panel.offsetHeight;
     newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - panelW));
@@ -53,12 +50,27 @@ function makeDraggable(panel, handleSelector) {
 
     panel.style.left = `${newLeft}px`;
     panel.style.top = `${newTop}px`;
-  });
+  }
 
-  document.addEventListener('mouseup', () => {
+  function onMouseUp() {
     if (isDragging) {
       isDragging = false;
       handle.style.cursor = 'grab';
     }
+  }
+
+  handle.addEventListener('mousedown', onMouseDown);
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+
+  // Auto-cleanup: when the panel is removed from the DOM, remove its
+  // document-level listeners too, so they don't accumulate over a long session.
+  const cleanupObserver = new MutationObserver(() => {
+    if (!document.body.contains(panel)) {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      cleanupObserver.disconnect();
+    }
   });
+  cleanupObserver.observe(document.body, { childList: true, subtree: true });
 }

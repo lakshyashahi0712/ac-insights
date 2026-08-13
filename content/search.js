@@ -30,6 +30,7 @@ const ACSearch = (() => {
     if (isOpen) return;
     isOpen = true;
     buildIndex();
+    selectedIndex = -1;
     render();
   }
 
@@ -120,9 +121,9 @@ const ACSearch = (() => {
     }
 
     const chapter = video.element.closest('.lrn-path-chapter');
-    const isOpen = chapter?.classList.contains('lrn-path-chapter-open');
+    const isChapterOpen = chapter?.classList.contains('lrn-path-chapter-open');  // renamed
 
-    if (chapter && !isOpen) {
+    if (chapter && !isChapterOpen) {
       const chapterTitleTxt = chapter.querySelector('.lrn-path-chapter-name-txt');
       const chapterTitleWrap = chapter.querySelector('.lrn-path-chapter-name');
       (chapterTitleTxt || chapterTitleWrap)?.click();

@@ -603,16 +603,10 @@ const ACPdfExport = (() => {
     notesText,
     screenshots = []
   ) {
-    const {
-      jsPDF
-    } = window.jspdf;
-
-
-    if (!jsPDF) {
-      throw new Error(
-        'jsPDF library not found.'
-      );
-    }
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+  throw new Error('jsPDF library not found.');
+}
+const { jsPDF } = window.jspdf;
 
 
     const doc =
@@ -1108,10 +1102,6 @@ const ACPdfExport = (() => {
 
     // ==========================================================
     // SCREEN CAPTURES
-    // Clean compact layout.
-    //
-    // There are NO divider lines between screenshots.
-    // Only a subtle border around each screenshot.
     // ==========================================================
 
     if (

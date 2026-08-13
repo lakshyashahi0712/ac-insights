@@ -21,11 +21,10 @@
     });
 
     await ACStorage.save({ summary, timestamp: Date.now() });
-    chrome.runtime.sendMessage({ type: 'DATA_UPDATED', payload: summary })
-      .catch(() => {});
 
     ACUI.injectSearchButton();
     ACSearch.attachIframeListener();
+    ACPreventAutoNext.recheck();
     await ACBookmarks.injectBookmarkButtons();
     ACCaptions.injectNotesButtons();
   }

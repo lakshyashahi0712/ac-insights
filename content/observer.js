@@ -37,6 +37,7 @@ const ACObserver = (() => {
   function stop() {
     observer?.disconnect();
     observer = null;
+    clearTimeout(debounceTimer);
   }
 
   return { start, stop };

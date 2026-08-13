@@ -2,12 +2,14 @@
 
 const ACCaptions = (() => {
 
-  const CHUNK_DURATION_MS = 15000;       // audio chunk length
-  const FRAME_CHECK_INTERVAL_MS = 3000;   // how often we check for a stable frame
-  const STABLE_CHECKS_NEEDED = 2;         // ~6 sec of no change = "settled"
-  const MIN_GAP_BETWEEN_CAPTURES_MS = 8000;
+  const CHUNK_DURATION_MS = 15000;         // audio chunk length
+  const FRAME_CHECK_INTERVAL_MS = 4000;    // har 4 sec check (thoda kam frequent)
+const STABLE_CHECKS_NEEDED = 3;          // ~12 sec stable rehna chahiye (pehle sirf 6 sec)
+const MIN_GAP_BETWEEN_CAPTURES_MS = 20000; // 2 screenshots ke beech kam se kam 20 sec gap
+const FALLBACK_MAX_WAIT_MS = 45000;      // continuous typing mein bhi 45 sec mein ek baar
+  
 
-  let isRecording = false;
+let isRecording = false;
   let isGeneratingNotes = false;
   let isTranscribingChunk = false;
   let accumulatedTranscript = '';
@@ -67,7 +69,7 @@ const ACCaptions = (() => {
   }
 
   // ============================================================
-  // NOTES STORAGE (now includes screenshots)
+  // NOTES STORAGE (includes screenshots)
   // ============================================================
   function getNotesKey(title) {
     return `ac_notes_${title.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -159,54 +161,75 @@ const ACCaptions = (() => {
     return canvas.toDataURL('image/jpeg', 0.6);
   }
 
- function startStabilityWatcher() {
-  stableCount = 0;
-  lastFrameSig = null;
-  lastCaptureTime = 0;
+  function startStabilityWatcher() {
+    stableCount = 0;
+    lastFrameSig = null;
+    lastCaptureTime = 0;
 
-  const FALLBACK_MAX_WAIT_MS = 20000; // force a capture if nothing settled in 20 sec (e.g. continuous typing)
+    stabilityInterval = setInterval(() => {
+      if (!isRecording || currentVideoElement?.paused) return;
 
-  stabilityInterval = setInterval(() => {
-    if (!isRecording || currentVideoElement?.paused) return;
+      const small = getSmallSignatureCanvas();
+      if (!small) return;
 
-    const small = getSmallSignatureCanvas();
-    if (!small) return;
+      const sig = computeSignature(small);
+      const now = Date.now();
+      const gapOk = now - lastCaptureTime > MIN_GAP_BETWEEN_CAPTURES_MS;
 
-    const sig = computeSignature(small);
-    const now = Date.now();
-    const gapOk = now - lastCaptureTime > MIN_GAP_BETWEEN_CAPTURES_MS;
+      if (lastFrameSig !== null && Math.abs(sig - lastFrameSig) < 300) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+      }
+      lastFrameSig = sig;
 
-    if (lastFrameSig !== null && Math.abs(sig - lastFrameSig) < 300) {
-      stableCount++;
-    } else {
+      // Primary trigger — frame has settled (teacher stopped typing/writing)
+      if (stableCount === STABLE_CHECKS_NEEDED && gapOk) {
+        captureNow(now);
+        return;
+      }
+
+      // Fallback trigger — content keeps changing continuously (e.g. live typing)
+      // so it never "settles", but we still want periodic progress snapshots
+      const tooLongSinceLastCapture = now - lastCaptureTime > FALLBACK_MAX_WAIT_MS;
+      if (tooLongSinceLastCapture) {
+        captureNow(now);
+      }
+    }, FRAME_CHECK_INTERVAL_MS);
+  }
+
+  function captureNow(timestamp) {
+    const dataUrl = captureFullFrame();
+    if (dataUrl) {
+      capturedScreenshots.push({
+        dataUrl,
+        timestamp,
+        videoTime: currentVideoElement?.currentTime || 0  // ← naya
+      });
+      lastCaptureTime = timestamp;
       stableCount = 0;
+      refreshScreenshotsInPanel();
     }
-    lastFrameSig = sig;
+}
 
-    // Primary trigger — frame has settled (teacher stopped typing/writing)
-    if (stableCount === STABLE_CHECKS_NEEDED && gapOk) {
-      captureNow(now);
+function captureManualScreenshot() {
+    if (!isRecording) {
+      alert('Live Notes chalu karo pehle (📝 click karo), tabhi screenshot le sakte ho.');
       return;
     }
 
-    // Fallback trigger — content keeps changing continuously (e.g. live typing in IDE)
-    // so it never "settles", but we still want periodic progress snapshots
-    const tooLongSinceLastCapture = now - lastCaptureTime > FALLBACK_MAX_WAIT_MS;
-    if (tooLongSinceLastCapture) {
-      captureNow(now);
+    const dataUrl = captureFullFrame();
+    if (dataUrl) {
+      capturedScreenshots.push({
+        dataUrl,
+        timestamp: Date.now(),
+        videoTime: currentVideoElement?.currentTime || 0,
+        manual: true  // manually liya gaya, badge dikhane ke liye
+      });
+      refreshScreenshotsInPanel();
     }
-  }, FRAME_CHECK_INTERVAL_MS);
 }
 
-function captureNow(timestamp) {
-  const dataUrl = captureFullFrame();
-  if (dataUrl) {
-    capturedScreenshots.push({ dataUrl, timestamp });
-    lastCaptureTime = timestamp;
-    stableCount = 0;
-    refreshScreenshotsInPanel();
-  }
-}
 
   function stopStabilityWatcher() {
     if (stabilityInterval) clearInterval(stabilityInterval);
@@ -218,14 +241,50 @@ function captureNow(timestamp) {
     return `
       <p class="ac-screenshots-label">📸 Screen captures (${screenshots.length})</p>
       <div class="ac-screenshots-scroll">
-        ${screenshots.map(s => `<img src="${s.dataUrl}" class="ac-screenshot-thumb" />`).join('')}
+        ${screenshots.map((s, i) => `
+          <div class="ac-screenshot-wrap" data-index="${i}">
+            <img src="${s.dataUrl}" class="ac-screenshot-thumb" data-video-time="${s.videoTime || 0}" />
+            ${s.manual ? '<span class="ac-manual-badge">✋</span>' : ''}
+            <span class="ac-screenshot-time">${formatVideoTime(s.videoTime)}</span>
+          </div>
+        `).join('')}
       </div>
     `;
-  }
+}function renderScreenshotsStrip(screenshots) {
+    if (!screenshots || screenshots.length === 0) return '';
+    return `
+      <p class="ac-screenshots-label">📸 Screen captures (${screenshots.length})</p>
+      <div class="ac-screenshots-scroll">
+        ${screenshots.map((s, i) => `
+          <div class="ac-screenshot-wrap" data-index="${i}">
+            <img src="${s.dataUrl}" class="ac-screenshot-thumb" data-video-time="${s.videoTime || 0}" />
+            ${s.manual ? '<span class="ac-manual-badge">✋</span>' : ''}
+            <span class="ac-screenshot-time">${formatVideoTime(s.videoTime)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+}
 
-  function attachScreenshotClickHandlers() {
+function formatVideoTime(seconds) {
+    if (!seconds) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function attachScreenshotClickHandlers() {
     document.querySelectorAll('.ac-screenshot-thumb').forEach(img => {
-      img.onclick = () => {
+      img.onclick = (e) => {
+        e.stopPropagation();
+        jumpToScreenshotMoment(parseFloat(img.dataset.videoTime));
+      };
+    });
+
+    document.querySelectorAll('.ac-screenshot-wrap').forEach(wrap => {
+      wrap.oncontextmenu = (e) => {
+        e.preventDefault();
+        const img = wrap.querySelector('img');
         const overlay = document.createElement('div');
         overlay.className = 'ac-screenshot-overlay';
         overlay.innerHTML = `<img src="${img.src}" />`;
@@ -233,7 +292,16 @@ function captureNow(timestamp) {
         document.body.appendChild(overlay);
       };
     });
-  }
+}
+
+function jumpToScreenshotMoment(videoTime) {
+    if (!currentVideoElement) {
+      alert('Video player not found.');
+      return;
+    }
+    currentVideoElement.currentTime = videoTime;
+    currentVideoElement.play();
+}
 
   function refreshScreenshotsInPanel() {
     const container = document.getElementById('ac-screenshots-container');
@@ -274,8 +342,12 @@ function captureNow(timestamp) {
   // ============================================================
   // STREAMING NOTES GENERATION
   // ============================================================
- async function generateNotes(transcript, title, apiKey, provider, onChunk) {
+  async function generateNotes(transcript, title, apiKey, provider, onChunk, isComplete = false) {
     const config = PROVIDERS[provider];
+
+    const statusInstruction = isComplete
+      ? ''
+      : `\n- The video is still playing and this transcript is incomplete — do NOT claim the lecture is finished, and add at the end: "⚠️ Note: Video is still playing, these are notes so far"`;
 
     const res = await fetch(config.chatUrl, {
       method: 'POST',
@@ -323,8 +395,7 @@ RULES:
 - Write the notes content in Hinglish using ROMAN/ENGLISH script only (e.g. "yeh function declare karna hota hai") — do NOT use Devanagari/Hindi script
 - Never default to Java unless the transcript's syntax actually indicates Java — check for language-specific keywords first
 - If this is a non-coding/theory topic, do not include a Code/Logic section at all
-- If the video is still playing, add at the end: "⚠️ Note: Video is still playing, these are notes so far"
-- If a section has no relevant content (other than Code/Logic), write "Not mentioned in transcript" instead of leaving it blank`
+- If a section has no relevant content (other than Code/Logic), write "Not mentioned in transcript" instead of leaving it blank${statusInstruction}`
         }]
       })
     });
@@ -368,30 +439,47 @@ RULES:
             fullText += delta;
             onChunk?.(fullText);
           }
-        } catch (e) {
-          // incomplete JSON chunk, wait for more data
-        }
+        } catch (e) {}
       }
     }
 
     return fullText;
-  }
+}
 
   // ============================================================
   // NOTES FORMATTING
+  // Code blocks are kept separate from prose so newlines inside code
+  // aren't double-converted to <br> (the <pre> CSS already handles them).
   // ============================================================
-  function formatNotesHTML(notes, isStreaming = false) {
-    let html = notes.replace(/```(\w+)?([\s\S]*?)```/g, '<pre class="ac-code-block"><code>$2</code></pre>');
-
-    if (isStreaming) {
-      html = html.replace(/```(\w+)?\n?([\s\S]*)$/, '<pre class="ac-code-block"><code>$2</code></pre>');
-    }
-
-    return html
+  function formatInline(text) {
+    return text
       .replace(/### (.*)/g, '<h4 class="ac-notes-h4">$1</h4>')
       .replace(/## (.*)/g, '<h3 class="ac-notes-h3">$1</h3>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n/g, '<br>');
+  }
+
+  function formatNotesHTML(notes, isStreaming = false) {
+    const codeBlockRegex = /```(\w+)?([\s\S]*?)```/g;
+    let html = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(notes)) !== null) {
+      html += formatInline(notes.slice(lastIndex, match.index));
+      html += `<pre class="ac-code-block"><code>${match[2]}</code></pre>`;
+      lastIndex = codeBlockRegex.lastIndex;
+    }
+    html += formatInline(notes.slice(lastIndex));
+
+    if (isStreaming) {
+      const openFence = html.match(/```(\w+)?\n?([\s\S]*)$/);
+      if (openFence) {
+        html = html.replace(/```(\w+)?\n?([\s\S]*)$/, `<pre class="ac-code-block"><code>${openFence[2]}</code></pre>`);
+      }
+    }
+
+    return html;
   }
 
   // ============================================================
@@ -446,10 +534,11 @@ RULES:
     }, CHUNK_DURATION_MS);
   }
 
-  async function updateLiveNotes() {
+  async function updateLiveNotes(isFinal = false) {
     const wordCount = accumulatedTranscript.trim().split(/\s+/).filter(Boolean).length;
 
-    ensureNotesPanel(currentVideoTitle);
+    const panel = ensureNotesPanel(currentVideoTitle);
+    if (!panel) return;
 
     if (isGeneratingNotes) return;
 
@@ -464,7 +553,7 @@ RULES:
       await generateNotes(accumulatedTranscript, currentVideoTitle, currentApiKey, currentProvider, (partial) => {
         liveText = partial;
         updateNotesContentLive(partial, true);
-      });
+      }, isFinal);   // ← isComplete flag pass ho raha hai
       updateNotesContentLive(liveText, false);
       await saveNotes(currentVideoTitle, liveText, accumulatedTranscript, capturedScreenshots);
     } catch (err) {
@@ -472,7 +561,7 @@ RULES:
     } finally {
       isGeneratingNotes = false;
     }
-  }
+}
 
   async function startLiveTranscription(title, apiKey, provider) {
     isRecording = true;
@@ -506,19 +595,41 @@ RULES:
     updateNotesStatusMessage('🏁 Video ended — finalizing your notes...');
 
     const title = currentVideoTitle;
+
+    // Wait for any in-flight chunk transcription to finish, so the final
+    // generation below uses the complete transcript, not a partial one.
     let waited = 0;
-    while ((isGeneratingNotes || isTranscribingChunk) && waited < 15000) {
+    while (isTranscribingChunk && waited < 15000) {
       await new Promise(r => setTimeout(r, 400));
       waited += 400;
     }
 
-    const saved = await loadNotes(title);
-    if (saved) {
-      showSavedNotesPanel(title, saved);
-    } else {
-      showNotesPanel(title, null, '⏹️ Video ended. No notes were generated (video may have been too short or too quiet).', false);
+    // Force one final, complete generation now that the video has genuinely ended —
+    // this is what removes the stale "video is still playing" note.
+    if (accumulatedTranscript.trim().length > 0) {
+      await updateLiveNotes(true);
     }
-  }
+
+    await finalizeAndShowNotes(title);
+}
+
+async function handleStopClick() {
+    stopLiveTranscription();
+
+    let waited = 0;
+    while (isTranscribingChunk && waited < 8000) {
+      await new Promise(r => setTimeout(r, 400));
+      waited += 400;
+    }
+
+    // Same idea — user explicitly stopped, so generate one final complete
+    // version instead of leaving the last "still playing" draft as final.
+    if (accumulatedTranscript.trim().length > 0) {
+      await updateLiveNotes(true);
+    }
+
+    await finalizeAndShowNotes(currentVideoTitle);
+}
 
   async function handleStopClick() {
     stopLiveTranscription();
@@ -529,13 +640,8 @@ RULES:
       waited += 400;
     }
 
-    const saved = await loadNotes(currentVideoTitle);
-    if (saved) {
-      showSavedNotesPanel(currentVideoTitle, saved);
-    } else {
-      showNotesPanel(currentVideoTitle, null, '⏹️ Live notes stopped. No notes have been generated yet.', false);
-    }
-  }
+    await finalizeAndShowNotes(currentVideoTitle);   // ← same fix yahan bhi
+}
 
   // ============================================================
   // LIGHTWEIGHT PANEL UPDATE HELPERS
@@ -543,6 +649,7 @@ RULES:
   function ensureNotesPanel(title) {
     const existing = document.getElementById('ac-notes-panel');
     if (existing && existing.dataset.videoTitle === title) return existing;
+    if (!isRecording) return null; // user already closed it — don't bring it back
     showNotesPanel(title, null, '🎙️ Live transcription started... Keep watching the video!', true);
     return document.getElementById('ac-notes-panel');
   }
@@ -557,6 +664,24 @@ RULES:
       </div>
     `;
   }
+
+
+  async function finalizeAndShowNotes(title) {
+    const saved = await loadNotes(title);
+
+    if (saved) {
+      // Screenshots capture faster than the notes-save cycle. Always sync the
+      // latest in-memory screenshots into storage before showing the final
+      // panel, so none captured near the end get silently dropped.
+      if (capturedScreenshots.length > (saved.screenshots?.length || 0)) {
+        await saveNotes(title, saved.notes, saved.transcript, capturedScreenshots);
+        saved.screenshots = capturedScreenshots;
+      }
+      showSavedNotesPanel(title, saved);
+    } else {
+      showNotesPanel(title, null, '⏹️ No notes were generated (video may have been too short or too quiet).', false);
+    }
+}
 
   function updateNotesContentLive(text, isStreaming) {
     const main = document.getElementById('ac-notes-main-content');
@@ -580,26 +705,44 @@ RULES:
   // ============================================================
   // UI PANELS
   // ============================================================
-  function panelShell({ headerLabel, title, meta, mainContentHTML, screenshots, footerHTML }) {
+ function panelShell({ headerLabel, title, meta, mainContentHTML, screenshots, footerHTML, showCaptureBtn }) {
     return `
       <div class="ac-notes-header">
-        <span>${headerLabel}</span>
-        <button id="ac-notes-close">✕</button>
+        <span>${headerLabel} ${showCaptureBtn ? '<button id="ac-manual-screenshot-btn" title="Take a screenshot right now">📷</button>' : ''}</span>
+        <div class="ac-notes-header-actions">
+          <button id="ac-notes-minimize" title="Minimize">—</button>
+          <button id="ac-notes-close">✕</button>
+        </div>
       </div>
-      <div class="ac-notes-title">${title}</div>
-      ${meta ? `<div class="ac-notes-meta">${meta}</div>` : ''}
-      <div class="ac-notes-body">
-        <div id="ac-notes-main-content">${mainContentHTML}</div>
-        <div id="ac-screenshots-container" class="ac-screenshots-strip">${renderScreenshotsStrip(screenshots)}</div>
+      <div class="ac-notes-collapsible">
+        <div class="ac-notes-title">${title}</div>
+        ${meta ? `<div class="ac-notes-meta">${meta}</div>` : ''}
+        <div class="ac-notes-body">
+          <div id="ac-notes-main-content">${mainContentHTML}</div>
+          <div id="ac-screenshots-container" class="ac-screenshots-strip">${renderScreenshotsStrip(screenshots)}</div>
+        </div>
+        ${footerHTML || ''}
       </div>
-      ${footerHTML || ''}
     `;
-  }
+}
 
   function attachCloseAndCopy(panel, notes) {
     document.getElementById('ac-notes-close')?.addEventListener('click', () => {
       stopLiveTranscription();
       panel.remove();
+    });
+
+    document.getElementById('ac-notes-minimize')?.addEventListener('click', (e) => {
+      const collapsible = panel.querySelector('.ac-notes-collapsible');
+      const btn = e.target;
+      const isMinimized = panel.classList.toggle('minimized');
+      collapsible.style.display = isMinimized ? 'none' : '';
+      btn.textContent = isMinimized ? '▢' : '—';
+      btn.title = isMinimized ? 'Expand' : 'Minimize';
+    });
+
+    document.getElementById('ac-manual-screenshot-btn')?.addEventListener('click', () => {
+      captureManualScreenshot();
     });
 
     document.getElementById('ac-notes-copy')?.addEventListener('click', () => {
@@ -610,7 +753,7 @@ RULES:
     });
 
     attachScreenshotClickHandlers();
-  }
+}
 
   function showNotesPanel(title, notes, message, isLive = false) {
     document.getElementById('ac-notes-panel')?.remove();
@@ -628,6 +771,7 @@ RULES:
       title,
       mainContentHTML,
       screenshots: capturedScreenshots,
+      showCaptureBtn: isLive,   // ← naya, sirf live recording mein dikhega
       footerHTML: isLive ? `<div class="ac-notes-footer"><button id="ac-notes-stop">⏹️ Stop Live Notes</button></div>` : ''
     });
 
@@ -636,7 +780,7 @@ RULES:
     attachCloseAndCopy(panel, notes);
 
     document.getElementById('ac-notes-stop')?.addEventListener('click', handleStopClick);
-  }
+}
 
   function showSavedNotesPanel(title, saved) {
     document.getElementById('ac-notes-panel')?.remove();
@@ -668,7 +812,6 @@ RULES:
     makeDraggable(panel, '.ac-notes-header');
     attachCloseAndCopy(panel, saved.notes);
 
-    // PDF download — apna independent block
     document.getElementById('ac-notes-pdf')?.addEventListener('click', async (e) => {
       const btn = e.target;
       const originalText = btn.textContent;
@@ -818,11 +961,5 @@ RULES:
     });
   }
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && isRecording) {
-      console.log('[AC Insights] Tab hidden, recording may be affected');
-    }
-  });
-
-  return { injectNotesButtons, showSettingsPrompt, getApiConfig, saveApiConfig, removeApiConfig };
+  return { injectNotesButtons, showSettingsPrompt };
 })();

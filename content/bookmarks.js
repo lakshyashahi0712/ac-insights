@@ -42,9 +42,10 @@ const ACBookmarks = (() => {
   // Inject a bookmark button next to each video row
   async function injectBookmarkButtons() {
     const items = document.querySelectorAll('li.lrn-path-cont');
+    const bookmarks = await getAll();
+    const bookmarkedTitles = new Set(bookmarks.map(b => b.title));
 
     for (const item of items) {
-      // Already injected check
       if (item.querySelector('.ac-bookmark-btn')) continue;
 
       const titleEl = item.querySelector('.lrn-path-cont-name');
@@ -58,7 +59,7 @@ const ACBookmarks = (() => {
       const topicTitle = topicEl ? topicEl.textContent.trim() : '';
       const duration = durationEl ? durationEl.textContent.trim() : '';
 
-      const bookmarked = await isBookmarked(title);
+      const bookmarked = bookmarkedTitles.has(title);  // ← instant, no await
 
       const btn = document.createElement('button');
       btn.className = `ac-bookmark-btn ${bookmarked ? 'active' : ''}`;
@@ -82,11 +83,10 @@ const ACBookmarks = (() => {
         }
       });
 
-      // Add inside the extras div
       const extrasEl = item.querySelector('.lrn-path-cont-extras');
       if (extrasEl) extrasEl.appendChild(btn);
     }
-  }
+}
 
   // Bookmarks panel — triggered from popup
   async function showPanel() {
@@ -175,16 +175,38 @@ const ACBookmarks = (() => {
 
   function jumpToVideoByTitle(title) {
     const items = document.querySelectorAll('li.lrn-path-cont');
+    let target = null;
+
     for (const item of items) {
       const t = item.querySelector('.lrn-path-cont-name')?.textContent.trim();
       if (t === title) {
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        item.click();
-        return;
+        target = item;
+        break;
       }
     }
-    alert(`Video "${title}" is not visible. Please expand its topic first.`);
-  }
 
-  return { injectBookmarkButtons, showPanel, getAll };
+    if (!target) {
+      alert(`Video "${title}" is not visible. Try expanding its topic first.`);
+      return;
+    }
+
+    const chapter = target.closest('.lrn-path-chapter');
+    const isOpen = chapter?.classList.contains('lrn-path-chapter-open');
+
+    if (chapter && !isOpen) {
+      const chapterTitleTxt = chapter.querySelector('.lrn-path-chapter-name-txt');
+      const chapterTitleWrap = chapter.querySelector('.lrn-path-chapter-name');
+      (chapterTitleTxt || chapterTitleWrap)?.click();
+    }
+
+    setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        const link = target.querySelector('.lrn-path-cont-link') || target;
+        link.click();
+      }, 500);
+    }, 500);
+}
+
+return { injectBookmarkButtons, showPanel };
 })();
