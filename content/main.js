@@ -53,12 +53,14 @@
     });
   }
 
+  // User ki saved choice pehle load karo, taaki recheck() sahi behave kare
+  await ACPreventAutoNext.init();
+
   const found = await waitForChapters();
   if (found) await runAnalysis();
 
   ACObserver.start(runAnalysis);
   ACPreventAutoNext.recheck();
-  ACPreventAutoNext.enable();
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'SHOW_SUMMARY') {
