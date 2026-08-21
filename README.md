@@ -44,6 +44,7 @@ Built for the **Sigma Plus (DSA + Dev)** course on Apna College Premium — but 
 
 ### ⏭️ No More Auto-Skip
 - Prevents the platform from automatically jumping to the next video the instant one ends, so you're not rushed past the end screen
+- **Toggle it on/off anytime** from the extension popup — the choice is saved and applies instantly to any open course tab (on by default)
 
 ### 🖱️ UX Details
 - All panels are **draggable**
