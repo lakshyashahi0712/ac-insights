@@ -82,16 +82,96 @@ const ACUI = (() => {
         <div class="ac-planner">
           <p>📅 Study Planner</p>
           <ul>${planHTML}</ul>
+          <div class="ac-deadline">
+            <label class="ac-deadline-label" for="ac-deadline-date">🎯 Finish by</label>
+            <div class="ac-deadline-row">
+              <input type="date" id="ac-deadline-date" min="${DurationUtils.todayISO()}">
+              <button id="ac-deadline-clear" title="Clear deadline" hidden>✕</button>
+            </div>
+            <p class="ac-deadline-result" id="ac-deadline-result">
+              Pick a date to see how much you need per day.
+            </p>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(panel);
-    
+
 makeDraggable(panel, '.ac-summary-header');
 
     document.getElementById('ac-summary-close')?.addEventListener('click', () => {
       panel.remove();
+    });
+
+    wireDeadline(summary);
+  }
+
+  /**
+   * Deadline mode — planner ka ulta: date do, roz ka target milega.
+   * Chuni hui date per-course save hoti hai.
+   */
+  function wireDeadline(summary) {
+    const input = document.getElementById('ac-deadline-date');
+    const clearBtn = document.getElementById('ac-deadline-clear');
+    const result = document.getElementById('ac-deadline-result');
+    if (!input || !result) return;
+
+    function render(dateStr) {
+      const pace = DurationUtils.requiredPace(
+        summary.remainingSeconds,
+        dateStr,
+        summary.remainingVideos
+      );
+
+      clearBtn.hidden = !dateStr;
+      result.classList.remove('heavy', 'invalid');
+
+      if (!pace) {
+        result.textContent = 'Pick a date to see how much you need per day.';
+        return;
+      }
+      if (pace.done) {
+        result.textContent = 'Course already complete — nothing left to schedule! 🎉';
+        return;
+      }
+      if (pace.past) {
+        result.textContent = 'That date has already passed — pick a future date.';
+        result.classList.add('invalid');
+        return;
+      }
+
+      const dayWord = pace.days === 1 ? 'day' : 'days';
+      const videoBit = pace.videosPerDay
+        ? ` · about ${pace.videosPerDay} ${pace.videosPerDay === 1 ? 'video' : 'videos'}/day`
+        : '';
+      const warning = pace.impossible
+        ? '⚠️ more than a day fits — pick a later date'
+        : pace.heavy ? '⚠️ that\'s a heavy pace' : '';
+
+      result.innerHTML = `
+        <strong>${pace.perDay}/day</strong> for ${pace.days} ${dayWord}${videoBit}
+        ${warning ? `<span class="ac-deadline-warn">${warning}</span>` : ''}
+      `;
+      if (pace.heavy) result.classList.add('heavy');
+    }
+
+    input.addEventListener('change', () => {
+      render(input.value);
+      ACStorage.saveDeadline(input.value);
+    });
+
+    clearBtn?.addEventListener('click', () => {
+      input.value = '';
+      render('');
+      ACStorage.saveDeadline(null);
+    });
+
+    // Pehle se saved deadline ho toh wapas dikhao
+    ACStorage.loadDeadline().then(saved => {
+      if (!saved) return;
+      input.value = saved;
+      render(saved);
     });
   }
 
