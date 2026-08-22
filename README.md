@@ -4,7 +4,7 @@
 left, helps you plan when you'll finish, lets you search all your lectures instantly, and can
 write notes for you while you watch.
 
-Made for **Sigma Plus (DSA + Dev)**, and works with other Apna College Premium courses too
+Made for **Sigma Plus (DSA + Dev)**, and works with other Apna College courses too
 (DSA in Java/C++, Web Dev, AI/ML, and theory lectures).
 
 No account to create. No payment. Nothing leaves your computer.
@@ -29,7 +29,7 @@ No account to create. No payment. Nothing leaves your computer.
 You need two things:
 
 1. **Google Chrome** on a laptop or desktop (Microsoft Edge and Brave also work — they're built on Chrome). This does **not** work on a phone or tablet.
-2. Your usual **Apna College Premium login**.
+2. Your usual **Apna College login**.
 
 Installing takes about 5 minutes. You don't need to know any coding.
 
