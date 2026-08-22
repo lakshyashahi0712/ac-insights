@@ -274,21 +274,7 @@ function captureManualScreenshot() {
         `).join('')}
       </div>
     `;
-}function renderScreenshotsStrip(screenshots) {
-    if (!screenshots || screenshots.length === 0) return '';
-    return `
-      <p class="ac-screenshots-label">📸 Screen captures (${screenshots.length})</p>
-      <div class="ac-screenshots-scroll">
-        ${screenshots.map((s, i) => `
-          <div class="ac-screenshot-wrap" data-index="${i}">
-            <img src="${s.dataUrl}" class="ac-screenshot-thumb" data-video-time="${s.videoTime || 0}" />
-            ${s.manual ? '<span class="ac-manual-badge">✋</span>' : ''}
-            <span class="ac-screenshot-time">${formatVideoTime(s.videoTime)}</span>
-          </div>
-        `).join('')}
-      </div>
-    `;
-}
+  }
 
 function formatVideoTime(seconds) {
     if (!seconds) return '0:00';
@@ -611,6 +597,34 @@ RULES:
     stopStabilityWatcher();
   }
 
+  /**
+   * Chunk transcription ya live generation chal rahi ho toh uske khatam hone ka wait.
+   * isGeneratingNotes ka wait zaroori hai — updateLiveNotes() us flag ke true hone par
+   * turant return kar deta hai, toh bina wait kiye final pass chupchaap skip ho jata.
+   */
+  async function waitForPendingWork(timeoutMs) {
+    let waited = 0;
+    while ((isGeneratingNotes || isTranscribingChunk) && waited < timeoutMs) {
+      await new Promise(r => setTimeout(r, 400));
+      waited += 400;
+    }
+  }
+
+  /**
+   * Session khatam karne ka ek hi raasta — chahe video apne aap khatam hua ho
+   * ya user ne Stop dabaya ho. Poore transcript par ek aakhri complete generation
+   * chalti hai, jo "video is still playing" wala disclaimer hatati hai.
+   */
+  async function finishNotesSession(title, timeoutMs) {
+    await waitForPendingWork(timeoutMs);
+
+    if (accumulatedTranscript.trim().length > 0) {
+      await updateLiveNotes(true);
+    }
+
+    await finalizeAndShowNotes(title);
+  }
+
   async function handleVideoEnded() {
     if (!isRecording) return;
     isRecording = false;
@@ -618,54 +632,13 @@ RULES:
 
     updateNotesStatusMessage('🏁 Video ended — finalizing your notes...');
 
-    const title = currentVideoTitle;
-
-    // Wait for any in-flight chunk transcription to finish, so the final
-    // generation below uses the complete transcript, not a partial one.
-    let waited = 0;
-    while (isTranscribingChunk && waited < 15000) {
-      await new Promise(r => setTimeout(r, 400));
-      waited += 400;
-    }
-
-    // Force one final, complete generation now that the video has genuinely ended —
-    // this is what removes the stale "video is still playing" note.
-    if (accumulatedTranscript.trim().length > 0) {
-      await updateLiveNotes(true);
-    }
-
-    await finalizeAndShowNotes(title);
-}
-
-async function handleStopClick() {
-    stopLiveTranscription();
-
-    let waited = 0;
-    while (isTranscribingChunk && waited < 8000) {
-      await new Promise(r => setTimeout(r, 400));
-      waited += 400;
-    }
-
-    // Same idea — user explicitly stopped, so generate one final complete
-    // version instead of leaving the last "still playing" draft as final.
-    if (accumulatedTranscript.trim().length > 0) {
-      await updateLiveNotes(true);
-    }
-
-    await finalizeAndShowNotes(currentVideoTitle);
-}
+    await finishNotesSession(currentVideoTitle, 15000);
+  }
 
   async function handleStopClick() {
     stopLiveTranscription();
-
-    let waited = 0;
-    while ((isGeneratingNotes || isTranscribingChunk) && waited < 8000) {
-      await new Promise(r => setTimeout(r, 400));
-      waited += 400;
-    }
-
-    await finalizeAndShowNotes(currentVideoTitle);   // ← same fix yahan bhi
-}
+    await finishNotesSession(currentVideoTitle, 8000);
+  }
 
   // ============================================================
   // LIGHTWEIGHT PANEL UPDATE HELPERS
