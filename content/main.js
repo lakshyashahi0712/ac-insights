@@ -12,6 +12,9 @@
     const data = ACParser.parseCourse();
     if (!data) return;
 
+    // Course registry update karo — popup ko courses list aur active course isse milta hai
+    await ACCourse.register();
+
     const { topics, summary } = data;
     ACUI.clearAllBadges();
 

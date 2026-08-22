@@ -2,15 +2,54 @@
 
 const ACBookmarks = (() => {
   const STORAGE_KEY = 'ac_insights_bookmarks';
+  const SCHEMA_VERSION = 2;
 
   // --- Storage ---
 
-  async function getAll() {
+  function emptyStore() {
+    return { v: SCHEMA_VERSION, courses: {} };
+  }
+
+  async function readRaw() {
     return new Promise(resolve => {
-      chrome.storage.local.get([STORAGE_KEY], result => {
-        resolve(result[STORAGE_KEY] || []);
-      });
+      try {
+        chrome.storage.local.get([STORAGE_KEY], result => resolve(result?.[STORAGE_KEY] ?? null));
+      } catch (e) {
+        resolve(null);
+      }
     });
+  }
+
+  /**
+   * Pehle sab bookmarks ek flat array me the — chahe kisi bhi course ke ho.
+   * Ab per-course: { v: 2, courses: { <courseId>: [...] } }
+   * Purana array current course ka maan kar adopt kar lete hain (kuch khota nahi).
+   */
+  function normalize(value, adoptCourseId) {
+    if (Array.isArray(value)) {
+      const store = emptyStore();
+      if (adoptCourseId) store.courses[adoptCourseId] = value;
+      return store;
+    }
+    if (value && value.v === SCHEMA_VERSION && value.courses && typeof value.courses === 'object') {
+      return value;
+    }
+    return emptyStore();
+  }
+
+  async function getStore() {
+    return normalize(await readRaw(), ACCourse.id());
+  }
+
+  async function getAll() {
+    const store = await getStore();
+    return store.courses[ACCourse.id()] || [];
+  }
+
+  async function setAll(list) {
+    const store = await getStore();
+    store.courses[ACCourse.id()] = list;
+    await chrome.storage.local.set({ [STORAGE_KEY]: store });
   }
 
   async function add(video) {
@@ -23,13 +62,12 @@ const ACBookmarks = (() => {
       duration: video.duration,
       savedAt: Date.now(),
     });
-    await chrome.storage.local.set({ [STORAGE_KEY]: bookmarks });
+    await setAll(bookmarks);
   }
 
   async function remove(title) {
     const bookmarks = await getAll();
-    const updated = bookmarks.filter(b => b.title !== title);
-    await chrome.storage.local.set({ [STORAGE_KEY]: updated });
+    await setAll(bookmarks.filter(b => b.title !== title));
   }
 
   async function isBookmarked(title) {
@@ -103,7 +141,7 @@ const ACBookmarks = (() => {
           <button id="ac-bm-close">✕</button>
         </div>
         <div class="ac-bm-empty">
-          <p>No bookmarks yet!</p>
+          <p>No bookmarks in this course yet!</p>
           <p>Click 🏷️ on any video to bookmark it.</p>
         </div>
       `;

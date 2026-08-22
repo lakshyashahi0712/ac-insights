@@ -17,6 +17,7 @@
         "lib/jspdf/jspdf.umd.min.js",
         "utils/duration.js",
         "utils/draggable.js",
+        "utils/course.js",
         "content/storage.js",
         "content/parser.js",
         "content/search.js",

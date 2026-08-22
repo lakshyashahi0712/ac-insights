@@ -71,8 +71,23 @@ let isRecording = false;
   // ============================================================
   // NOTES STORAGE (includes screenshots)
   // ============================================================
+  function slugTitle(title) {
+    return String(title).replace(/[^a-zA-Z0-9]/g, '_');
+  }
+
+  /**
+   * Course ke hisaab se namespaced key — do courses me same naam ka lecture ho
+   * (jaise "Introduction") toh unke notes ek dusre ko overwrite na karein.
+   * '::' separator jaan-bujh ke use kiya hai: slug me sirf letters/digits/_ aate
+   * hain, toh yeh boundary kabhi ambiguous nahi hogi.
+   */
   function getNotesKey(title) {
-    return `ac_notes_${title.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    return `ac_notes::${ACCourse.id()}::${slugTitle(title)}`;
+  }
+
+  /** Course-scoping se pehle notes sirf video title pe save hote the */
+  function getLegacyNotesKey(title) {
+    return `ac_notes_${slugTitle(title)}`;
   }
 
   async function saveNotes(title, notes, transcript, screenshots = []) {
@@ -81,8 +96,12 @@ let isRecording = false;
       chrome.storage.local.set({
         [key]: { notes, transcript, screenshots, videoTitle: title, savedAt: Date.now() }
       }, () => {
-        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-        else resolve();
+        if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+        // Namespaced copy ban gayi — purani duplicate hata do (best effort, screenshots bhaari hote hain)
+        chrome.storage.local.remove(getLegacyNotesKey(title), () => {
+          void chrome.runtime.lastError;
+          resolve();
+        });
       })
     );
   }
@@ -90,13 +109,18 @@ let isRecording = false;
   async function loadNotes(title) {
     const key = getNotesKey(title);
     return new Promise(resolve =>
-      chrome.storage.local.get([key], r => resolve(r[key] || null))
+      chrome.storage.local.get([key], r => {
+        if (r[key]) return resolve(r[key]);
+        // Purane (course-scoping se pehle ke) notes bhi padho — kuch gum na ho
+        const legacyKey = getLegacyNotesKey(title);
+        chrome.storage.local.get([legacyKey], lr => resolve(lr[legacyKey] || null));
+      })
     );
   }
 
   async function deleteNotes(title) {
     return new Promise(resolve =>
-      chrome.storage.local.remove(getNotesKey(title), resolve)
+      chrome.storage.local.remove([getNotesKey(title), getLegacyNotesKey(title)], resolve)
     );
   }
 
