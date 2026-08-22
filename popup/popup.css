@@ -29,6 +29,40 @@ body {
   padding: 12px 16px;
 }
 
+.hidden {
+  display: none !important;
+}
+
+/* Course switcher — sirf multiple courses hone pe dikhta hai */
+#course-select {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 12px 16px 0;
+  padding: 7px 8px;
+  background: #1e293b;
+  color: #f1f5f9;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#course-select:hover {
+  background: #334155;
+}
+
+.course-name {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .hint {
   color: #94a3b8;
   font-size: 12px;
