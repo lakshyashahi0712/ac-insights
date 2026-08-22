@@ -16,11 +16,23 @@ Built for the **Sigma Plus (DSA + Dev)** course on Apna College Premium — but 
 ### 📅 Study Planner
 - Estimates days-to-finish the remaining course based on daily study time (30 min / 1 hr / 2 hr per day)
 
+### 🎯 Deadline Mode
+- The planner in reverse: pick the date you **want to be done by**, and it tells you the pace that actually gets you there
+- Shows required **watch time per day** and roughly **how many videos per day**, computed from what's still unwatched
+- Warns when the pace crosses ~4 hrs/day ("heavy"), and when it exceeds what fits in a day at all ("pick a later date")
+- The date is **saved per course**, so each course keeps its own target
+
 ### 🔍 Search
 - Instant lecture search with `Ctrl+K` — search across 500+ videos by name or topic
 - Works both on the main page **and inside the video player** (the player runs in an embedded iframe, so the shortcut is attached there too — otherwise Chrome's own address-bar search would intercept it)
 - Automatically expands collapsed topics and jumps straight to the selected video
 - Floating search button (collapses on scroll, becomes translucent when idle)
+
+### 🎓 Per-Course Separation
+- Every course you open gets its **own** stats, bookmarks, notes and deadline — nothing is shared or overwritten between them
+- The popup has a **course switcher**: pick any course you've visited to see its progress, or **"All courses"** for combined totals
+- Courses are identified from the URL (with a title-based fallback), so switching courses in the same tab is picked up immediately
+- Existing data from before this change is adopted into the course you're currently viewing rather than discarded
 
 ### 🔖 Bookmarks
 - Bookmark any video with one click
@@ -142,23 +154,44 @@ ac-insights/
 │   ├── ui.js
 │   ├── search.js
 │   ├── bookmarks.js
-│   ├── captions.js
+│   ├── caption.js
 │   ├── pdf-export.js
 │   ├── prevent-autonext.js
 │   ├── storage.js
 │   └── observer.js
 ├── utils/
 │   ├── duration.js
+│   ├── course.js
 │   └── draggable.js
 ├── popup/
 │   ├── popup.html
 │   ├── popup.js
 │   └── popup.css
-└── styles/
-    └── injected.css
+├── styles/
+│   └── injected.css
+└── tests/
+    ├── helpers/
+    │   ├── load.js
+    │   └── fake-chrome.js
+    ├── duration.test.js
+    ├── course-scope.test.js
+    └── notes-finalize.test.js
 ```
 
 ---
+
+## 🧪 Tests
+
+No dependencies to install — Node's built-in runner over the real source files.
+
+```bash
+npm test
+```
+
+Covers the deadline/duration math, per-course storage scoping and migration, and the
+notes finalize control flow. See [tests/README.md](tests/README.md) for what's covered,
+what isn't, and how to add a test. `tests/` and `package.json` are dev-only; leave them
+out when zipping the extension.
 
 ---
 
