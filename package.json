@@ -1,0 +1,11 @@
+{
+  "name": "ac-insights",
+  "private": true,
+  "description": "Tooling for the AC Insights Chrome extension. The extension itself has no dependencies and no build step — this file exists only so `npm test` works.",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

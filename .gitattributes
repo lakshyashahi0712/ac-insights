@@ -1,0 +1,8 @@
+# Dev-only files: kept in the repo, excluded from `git archive` so they never
+# end up in the Chrome Web Store zip.
+#
+# Build the upload with:  git archive --format=zip -o ac-insights.zip HEAD
+tests/          export-ignore
+package.json    export-ignore
+.gitattributes  export-ignore
+.claude/        export-ignore
